@@ -1,12 +1,21 @@
 package com.futuristic.sounds
 
+import android.content.ComponentName
 import android.content.Context
+import android.service.quicksettings.TileService
 
 object Prefs {
     private fun sp(c: Context) = c.getSharedPreferences("futuristic", Context.MODE_PRIVATE)
 
     fun masterOn(c: Context) = sp(c).getBoolean("master_on", true)
-    fun setMasterOn(c: Context, v: Boolean) = sp(c).edit().putBoolean("master_on", v).apply()
+    fun setMasterOn(c: Context, v: Boolean) {
+        sp(c).edit().putBoolean("master_on", v).apply()
+        // ऐप के अंदर स्विच बदलते ही Quick Settings वाली टाइल को भी तुरंत अपडेट होने को कहें
+        try {
+            TileService.requestListeningState(c, ComponentName(c, SoundQuickTile::class.java))
+        } catch (_: Exception) {
+        }
+    }
 
     fun master(c: Context) = sp(c).getInt("master_vol", 80)
     fun setMaster(c: Context, v: Int) = sp(c).edit().putInt("master_vol", v).apply()
