@@ -30,4 +30,12 @@ object Prefs {
     fun activationCode(c: Context): String? = sp(c).getString("activation_code", null)
     fun setActivationCode(c: Context, code: String) =
         sp(c).edit().putString("activation_code", code).apply()
+
+    // ---- ऐप लॉक (PIN) ----
+    // डिफ़ॉल्ट/डमी PIN जो पहली बार दिखेगा — ऐप खोलने पर यूज़र इसे बदल सकता है
+    const val DEFAULT_APP_PIN = "0000"
+
+    fun appLockPin(c: Context): String = sp(c).getString("app_lock_pin", DEFAULT_APP_PIN) ?: DEFAULT_APP_PIN
+    fun setAppLockPin(c: Context, pin: String) =
+        sp(c).edit().putString("app_lock_pin", pin).apply()
 }
