@@ -6,12 +6,14 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.net.Uri
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -30,6 +32,7 @@ class MainActivity : Activity() {
     private val CARD = Color.parseColor("#141B33")
     private val CYAN = Color.parseColor("#00E5FF")
     private val DIM = Color.parseColor("#9AA5C4")
+    private val ON_CYAN = Color.parseColor("#00212A") // cyan बटन पर टेक्स्ट का रंग
 
     private lateinit var status: TextView
     private val customLabels = HashMap<SoundEvent, TextView>()
@@ -59,83 +62,246 @@ class MainActivity : Activity() {
             })
         }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        SoundEngine.init(this)
+    // ---------------- मॉडर्न UI हेल्पर्स ----------------
 
-        if (!License.isActivated(this)) {
-            showActivationScreen()
-        } else {
-            showMainUi()
+    private fun roundedBg(radiusDp: Int, fill: Int, strokeColor: Int? = null, strokeWidthDp: Int = 0) =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(radiusDp).toFloat()
+            setColor(fill)
+            if (strokeColor != null) setStroke(dp(strokeWidthDp), strokeColor)
         }
-    }
 
-    // ---------------- एक्टिवेशन स्क्रीन ----------------
-
-    private fun showActivationScreen() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(40), dp(20), dp(24))
+    /** भरा हुआ (filled) मुख्य बटन */
+    private fun pillButton(text: String, onClick: () -> Unit): TextView =
+        TextView(this).apply {
+            this.text = text
+            setTextColor(ON_CYAN)
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setTypeface(typeface, Typeface.BOLD)
+            background = roundedBg(14, CYAN)
+            setPadding(dp(18), dp(15), dp(18), dp(15))
+            setOnClickListener { onClick() }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(16) }
         }
-        val scroll = ScrollView(this).apply {
-            setBackgroundColor(BG)
-            addView(root)
+
+    /** बॉर्डर वाला हल्का (ghost) बटन */
+    private fun ghostButton(text: String, onClick: () -> Unit): TextView =
+        TextView(this).apply {
+            this.text = text
+            setTextColor(CYAN)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            background = roundedBg(14, Color.TRANSPARENT, CYAN, 1)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setOnClickListener { onClick() }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(12) }
         }
-        setContentView(scroll)
 
-        val deviceId = License.deviceId(this)
-
-        root.addView(tv("FUTURISTIC SOUNDS", 22f, CYAN, true))
-        root.addView(tv("यह ऐप एक्टिवेट नहीं है", 16f, Color.WHITE, true).apply {
-            setPadding(0, dp(16), 0, dp(6))
-        })
-        root.addView(tv(
-            "नीचे दी गई Device ID को license_generator.html (कंप्यूटर पर, Windows में डबल-क्लिक करके खोलें) में डालें, वहाँ से मिला कोड यहाँ नीचे डालकर 'एक्टिवेट करें' दबाएँ।",
-            13f, DIM
-        ).apply { setPadding(0, dp(4), 0, dp(16)) })
-
-        root.addView(tv("Device ID:", 12f, DIM))
-        val idBox = tv(deviceId, 16f, Color.WHITE, true).apply {
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            setBackgroundColor(CARD)
-        }
-        root.addView(idBox)
-
-        root.addView(Button(this).apply {
-            text = "Device ID कॉपी करें"
-            setOnClickListener {
-                val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("device_id", deviceId))
-                Toast.makeText(this@MainActivity, "कॉपी हो गया", Toast.LENGTH_SHORT).show()
-            }
-        }.apply { (layoutParams as? LinearLayout.LayoutParams)?.topMargin = dp(8) })
-
-        val input = EditText(this).apply {
-            hint = "एक्टिवेशन कोड (XXXX-XXXX-XXXX-XXXX)"
-            setTextColor(Color.WHITE)
+    private fun modernInput(hintText: String, numericSecret: Boolean = false): EditText =
+        EditText(this).apply {
+            hint = hintText
             setHintTextColor(DIM)
-            setPadding(dp(10), dp(10), dp(10), dp(10))
-        }
-        root.addView(input.apply {
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            textSize = 17f
+            if (numericSecret) {
+                inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            }
+            background = roundedBg(14, CARD, DIM, 1)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(20) }
-        })
+        }
 
-        root.addView(Button(this).apply {
-            text = "एक्टिवेट करें"
-            setOnClickListener {
-                if (License.activate(this@MainActivity, input.text.toString())) {
-                    Toast.makeText(this@MainActivity, "✅ एक्टिवेशन सफल", Toast.LENGTH_SHORT).show()
-                    recreate()
-                } else {
-                    Toast.makeText(this@MainActivity, "❌ गलत कोड, दोबारा कोशिश करें", Toast.LENGTH_LONG).show()
-                }
-            }
-        }.apply { (layoutParams as? LinearLayout.LayoutParams)?.topMargin = dp(12) })
+    private fun screenRoot(): LinearLayout {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(28), dp(72), dp(28), dp(28))
+        }
+        setContentView(ScrollView(this).apply {
+            setBackgroundColor(BG)
+            addView(root)
+        })
+        return root
     }
 
-    // ---------------- मुख्य UI (एक्टिवेशन के बाद) ----------------
+    // ---------------- लाइफ़साइकल ----------------
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        SoundEngine.init(this)
+        renderInitial()
+    }
+
+    private fun renderInitial() {
+        when {
+            !License.isActivated(this) -> showActivationScreen()
+            !AppLock.isUnlockedThisSession -> showLockScreen()
+            else -> showMainUi()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (License.isActivated(this) && !AppLock.isUnlockedThisSession) {
+            showLockScreen()
+            return
+        }
+        refreshStatusText()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // ऐप background में जाते ही लॉक हो जाए, अगली बार खुलने पर PIN माँगे
+        AppLock.isUnlockedThisSession = false
+    }
+
+    private fun refreshStatusText() {
+        if (!this::status.isInitialized) return
+        val enabled = Settings.Secure.getString(
+            contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        )?.contains(packageName) == true
+        status.text = if (enabled) "✅ सेवा चालू है, साउंड बज रहे हैं"
+        else "⚠️ सेवा बंद है। नीचे बटन से Accessibility में 'Futuristic Sounds' चालू करें।"
+    }
+
+    // ---------------- एक्टिवेशन स्क्रीन (मॉडर्न, मिनिमल) ----------------
+
+    private fun showActivationScreen() {
+        val root = screenRoot()
+        val deviceId = License.deviceId(this)
+
+        root.addView(tv("FUTURISTIC SOUNDS", 20f, CYAN, true).apply { gravity = Gravity.CENTER })
+
+        root.addView(TextView(this).apply {
+            text = deviceId
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            background = roundedBg(14, CARD)
+            setPadding(dp(16), dp(18), dp(16), dp(18))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(28) }
+        })
+
+        root.addView(ghostButton("Device ID कॉपी करें") {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("device_id", deviceId))
+            Toast.makeText(this, "कॉपी हो गया", Toast.LENGTH_SHORT).show()
+        })
+
+        val codeInput = modernInput("XXXX-XXXX-XXXX-XXXX")
+        root.addView(codeInput)
+
+        root.addView(pillButton("एक्टिवेट करें") {
+            if (License.activate(this, codeInput.text.toString())) {
+                Toast.makeText(this, "✅ एक्टिवेट हो गया", Toast.LENGTH_SHORT).show()
+                recreate()
+            } else {
+                Toast.makeText(this, "❌ गलत कोड", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    // ---------------- ऐप लॉक स्क्रीन ----------------
+
+    private fun showLockScreen() {
+        val root = screenRoot()
+
+        root.addView(tv("🔒", 36f, CYAN).apply { gravity = Gravity.CENTER })
+        root.addView(tv("FUTURISTIC SOUNDS", 16f, CYAN, true).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, 0)
+        })
+
+        val pinInput = modernInput("PIN डालें", numericSecret = true)
+        root.addView(pinInput)
+
+        root.addView(pillButton("अनलॉक करें") {
+            if (pinInput.text.toString() == Prefs.appLockPin(this)) {
+                AppLock.isUnlockedThisSession = true
+                showMainUi()
+            } else {
+                Toast.makeText(this, "❌ गलत PIN", Toast.LENGTH_SHORT).show()
+            }
+        })
+
+        root.addView(ghostButton("पासवर्ड भूल गए?") { showResetPinScreen() })
+    }
+
+    private fun showResetPinScreen() {
+        val root = screenRoot()
+
+        root.addView(tv("PIN रीसेट करें", 17f, CYAN, true).apply { gravity = Gravity.CENTER })
+        root.addView(tv("अपना एक्टिवेशन कोड डालें", 12f, DIM).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, 0)
+        })
+
+        val codeInput = modernInput("XXXX-XXXX-XXXX-XXXX")
+        root.addView(codeInput)
+
+        root.addView(pillButton("रीसेट करें") {
+            val typed = codeInput.text.toString().trim().uppercase()
+            if (typed == License.expectedCode(License.deviceId(this))) {
+                Prefs.setAppLockPin(this, Prefs.DEFAULT_APP_PIN)
+                Toast.makeText(
+                    this, "PIN डिफ़ॉल्ट (${Prefs.DEFAULT_APP_PIN}) पर रीसेट हो गया", Toast.LENGTH_LONG
+                ).show()
+                showLockScreen()
+            } else {
+                Toast.makeText(this, "❌ गलत कोड", Toast.LENGTH_SHORT).show()
+            }
+        })
+
+        root.addView(ghostButton("वापस") { showLockScreen() })
+    }
+
+    private fun showChangePasswordScreen() {
+        val root = screenRoot()
+
+        root.addView(tv("पासवर्ड बदलें", 17f, CYAN, true).apply { gravity = Gravity.CENTER })
+
+        val currentInput = modernInput("मौजूदा PIN", numericSecret = true)
+        val newInput = modernInput("नया PIN", numericSecret = true)
+        val confirmInput = modernInput("नया PIN दोबारा", numericSecret = true)
+        root.addView(currentInput)
+        root.addView(newInput)
+        root.addView(confirmInput)
+
+        root.addView(pillButton("सेव करें") {
+            val cur = currentInput.text.toString()
+            val n1 = newInput.text.toString()
+            val n2 = confirmInput.text.toString()
+            when {
+                cur != Prefs.appLockPin(this) ->
+                    Toast.makeText(this, "❌ मौजूदा PIN गलत है", Toast.LENGTH_SHORT).show()
+                n1.isBlank() ->
+                    Toast.makeText(this, "नया PIN डालें", Toast.LENGTH_SHORT).show()
+                n1 != n2 ->
+                    Toast.makeText(this, "❌ नया PIN मैच नहीं हुआ", Toast.LENGTH_SHORT).show()
+                else -> {
+                    Prefs.setAppLockPin(this, n1)
+                    Toast.makeText(this, "✅ PIN बदल गया", Toast.LENGTH_SHORT).show()
+                    showMainUi()
+                }
+            }
+        })
+
+        root.addView(ghostButton("वापस") { showMainUi() })
+    }
+
+    // ---------------- मुख्य UI (एक्टिवेशन + लॉक के बाद) ----------------
 
     private fun showMainUi() {
         val root = LinearLayout(this).apply {
@@ -160,6 +326,8 @@ class MainActivity : Activity() {
             12f, DIM
         ).apply { setPadding(0, dp(6), 0, dp(12)) })
 
+        root.addView(ghostButton("🔒 पासवर्ड बदलें") { showChangePasswordScreen() })
+
         // मास्टर कंट्रोल
         val master = card()
         master.addView(Switch(this).apply {
@@ -179,6 +347,8 @@ class MainActivity : Activity() {
             "टिप: कस्टम साउंड छोटा (कुछ सेकंड का) रखें, WAV/MP3/OGG चलेगा।",
             12f, DIM
         ).apply { setPadding(0, dp(12), 0, 0) })
+
+        refreshStatusText()
     }
 
     private fun card(): LinearLayout = LinearLayout(this).apply {
@@ -270,15 +440,5 @@ class MainActivity : Activity() {
         } catch (ex: Exception) {
             Toast.makeText(this, "साउंड जोड़ने में दिक्कत: ${ex.message}", Toast.LENGTH_LONG).show()
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (!this::status.isInitialized) return // एक्टिवेशन स्क्रीन पर है
-        val enabled = Settings.Secure.getString(
-            contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        )?.contains(packageName) == true
-        status.text = if (enabled) "✅ सेवा चालू है, साउंड बज रहे हैं"
-        else "⚠️ सेवा बंद है। नीचे बटन से Accessibility में 'Futuristic Sounds' चालू करें।"
     }
 }
