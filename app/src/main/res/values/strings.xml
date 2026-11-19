@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Futuristic Sounds</string>
+    <string name="service_desc">फोन के हर टच, स्वाइप, स्क्रॉल, ऐप खुलने और बैक/होम/रिसेंट पर फ्यूचरिस्टिक साउंड बजाता है। यह सिर्फ इवेंट पहचानता है, कोई डेटा इकट्ठा या भेजता नहीं है।</string>
+</resources>
