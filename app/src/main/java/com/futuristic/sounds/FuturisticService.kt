@@ -21,6 +21,21 @@ class FuturisticService : AccessibilityService() {
         private val RECENTS_CLASS_HINTS = listOf(
             "Recents", "Overview", "Taskbar", "QuickStep", "RecentTask", "RecentsView"
         )
+
+        // नोटिफिकेशन पैनल / क्विक-सेटिंग्स पैनल — Android version और फ़ोन ब्रांड के हिसाब से
+        // क्लास-नाम बदलता रहता है (Android 13+ में "CentralSurfaces"/"Shade*" नाम आया),
+        // इसलिए पुराने और नए दोनों तरह के नाम शामिल किए हैं
+        private val SHADE_CLASS_HINTS = listOf(
+            "NotificationShade", "StatusBar", "NotificationPanel", "QuickSettings",
+            "Shade", "CentralSurfaces", "QSPanel", "QSFragment", "ControlCenter",
+            "Notification"
+        )
+
+        // होम स्क्रीन से ऊपर स्वाइप करने पर खुलने वाला "App Drawer" (सारे ऐप्स वाली लिस्ट)
+        // ज़्यादातर लॉन्चर में एक अलग विंडो/एक्टिविटी के तौर पर खुलता है
+        private val APP_DRAWER_CLASS_HINTS = listOf(
+            "AllApps", "AppsCustomize", "AppDrawer", "Apps"
+        )
     }
 
     private var lastPkg = ""
@@ -133,15 +148,17 @@ class FuturisticService : AccessibilityService() {
             return
         }
         if (pkg == "com.android.systemui") {
-            if (cls.contains("NotificationShade", true) ||
-                cls.contains("StatusBar", true) ||
-                cls.contains("NotificationPanel", true) ||
-                cls.contains("QuickSettings", true) ||
-                cls.contains("Shade", true)
-            ) fire(SoundEvent.SHADE, 400)
+            if (SHADE_CLASS_HINTS.any { cls.contains(it, true) }) fire(SoundEvent.SHADE, 400)
             return
         }
         if (pkg in homePkgs) {
+            // होम स्क्रीन पर ऊपर स्वाइप करने से खुलने वाला App Drawer — कई लॉन्चर में यह एक
+            // अलग विंडो की तरह खुलता है (स्क्रॉल इवेंट नहीं, विंडो-चेंज इवेंट के रूप में आता है)
+            if (APP_DRAWER_CLASS_HINTS.any { cls.contains(it, true) }) {
+                fire(SoundEvent.SWIPE_UP, 250)
+                lastPkg = pkg
+                return
+            }
             if (lastPkg.isNotEmpty() && lastPkg != pkg) fire(SoundEvent.HOME, 400)
             lastPkg = pkg
             return
